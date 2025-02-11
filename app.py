@@ -1,11 +1,10 @@
 from flask import Flask, redirect, url_for, session, request, render_template
 from flask_session import Session
-from oauthlib.oauth2 import WebApplicationClient
 from requests_oauthlib import OAuth2Session
 import os
-import secrets
-import base64
-import hashlib
+
+# Allow insecure transport during development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
 app = Flask(__name__, template_folder='docs')
 app.secret_key = 'swanRiver'  # Replace with a real secret key
@@ -15,17 +14,12 @@ Session(app)
 # Azure AD credentials
 CLIENT_ID = '7d3a3c1c-46ec-4247-9ed4-ef0d1526c5b9'  # Replace with your Application (client) ID
 CLIENT_SECRET = '1pF8Q~cPp9z-i_1N3gkeN4FN4t3gT9_7fcl-Tcek'  # Replace with your client secret
-AUTHORITY = 'https://login.microsoftonline.com/170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259'
-REDIRECT_URI = 'https://jcwill23-uh.github.io/Swan-River-Group-Project/basic_user_home.html'
+AUTHORITY = 'https://login.microsoftonline.com/common'  # Use common endpoint for multi-tenant and personal accounts
+REDIRECT_URI = 'http://localhost:5000/login/authorized'
 SCOPE = ['User.Read', 'Files.ReadWrite', 'email', 'openid', 'profile']
 
 # OAuth2 session
-client = WebApplicationClient(CLIENT_ID)
-
-def generate_pkce_pair():
-    code_verifier = base64.urlsafe_b64encode(secrets.token_bytes(32)).rstrip(b'=').decode('utf-8')
-    code_challenge = base64.urlsafe_b64encode(hashlib.sha256(code_verifier.encode('utf-8')).digest()).rstrip(b'=').decode('utf-8')
-    return code_verifier, code_challenge
+oauth = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
 @app.route('/')
 def home():
@@ -33,43 +27,22 @@ def home():
 
 @app.route('/login')
 def login():
-    code_verifier, code_challenge = generate_pkce_pair()
-    session['code_verifier'] = code_verifier
-
-    state = secrets.token_urlsafe(16)  # Generate a random state value
+    authorization_url, state = oauth.authorization_url(f'{AUTHORITY}/oauth2/v2.0/authorize')
     session['oauth_state'] = state
-
-    authorization_url = client.prepare_request_uri(
-        f'{AUTHORITY}/oauth2/v2.0/authorize',
-        redirect_uri=REDIRECT_URI,
-        scope=SCOPE,
-        state=state,
-        code_challenge=code_challenge,
-        code_challenge_method='S256'
-    )
-
     return redirect(authorization_url)
 
 @app.route('/login/authorized')
 def authorized():
     try:
-        token_url, headers, body = client.prepare_token_request(
+        token = oauth.fetch_token(
             f'{AUTHORITY}/oauth2/v2.0/token',
-            authorization_response=request.url,
-            redirect_url=REDIRECT_URI,
-            code_verifier=session['code_verifier']
-        )
-        token_response = OAuth2Session(CLIENT_ID).fetch_token(
-            token_url,
             client_secret=CLIENT_SECRET,
-            authorization_response=request.url,
-            headers=headers,
-            body=body
+            authorization_response=request.url
         )
-        session['oauth_token'] = token_response
+        session['oauth_token'] = token
 
         # Fetch user info
-        graph_client = OAuth2Session(CLIENT_ID, token=token_response)
+        graph_client = OAuth2Session(CLIENT_ID, token=token)
         user_info = graph_client.get('https://graph.microsoft.com/v1.0/me').json()
         session['user_name'] = user_info['displayName']
         session['user_email'] = user_info['mail']  # Store user email in session
@@ -80,9 +53,9 @@ def authorized():
 
         # Redirect based on user role
         if is_admin:
-            return redirect(url_for('admin.html'))
+            return redirect(url_for('admin'))
         else:
-            return redirect(url_for('basic_user_home.html'))
+            return redirect(url_for('basic_user_home'))
 
     except Exception as e:
         print("Error during authorization:", str(e))  # Debug: Print the error
