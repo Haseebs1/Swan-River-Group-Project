@@ -23,7 +23,7 @@ oauth = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
 
 @app.route('/')
 def home():
-    return render_template('login.html')
+    return render_template('index.html'
 
 @app.route('/login')
 def login():
