@@ -15,7 +15,7 @@ Session(app)
 CLIENT_ID = '7d3a3c1c-46ec-4247-9ed4-ef0d1526c5b9'  # Replace with your Application (client) ID
 CLIENT_SECRET = '1pF8Q~cPp9z-i_1N3gkeN4FN4t3gT9_7fcl-Tcek'  # Replace with your client secret
 AUTHORITY = 'https://login.microsoftonline.com/common'  # Use common endpoint for multi-tenant and personal accounts
-REDIRECT_URI = 'http://localhost:5000/login/authorized'
+REDIRECT_URI = 'https://swanriver-hpchbdasddbqfxd4.centralus-01.azurewebsites.net/login/authorized'
 SCOPE = ['User.Read', 'Files.ReadWrite', 'email', 'openid', 'profile']
 
 # OAuth2 session
