@@ -7,6 +7,10 @@ from requests_oauthlib import OAuth2Session
 app = Flask(__name__, static_folder="docs", template_folder="docs")
 app.secret_key = "your_secret_key"  # Replace with a secure secret key
 
+# Home route
+@app.route("/")
+def home():
+    return render_template("index.html")
 # Azure AD configuration
 CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD app's Client ID
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
@@ -146,10 +150,6 @@ def _acquire_token_by_auth_code_flow(request_args):
     )
     return result
 
-# Home route
-@app.route("/")
-def home():
-    return render_template("index.html")
 
 if __name__ == "__main__":
     app.run(debug=True, host="0.0.0.0", port=8000)
