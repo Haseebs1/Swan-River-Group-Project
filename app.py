@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for, session
+from flask import Flask, redirect, url_for, session, render_template, request
 import os
 
 app = Flask(__name__)
@@ -13,10 +13,15 @@ AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}/oauth2/v2.0/authoriz
 
 @app.route("/")
 def index():
+    if "user" in session:
+        return render_template("index.html", user=session["user"])
     return render_template("index.html")
 
 @app.route("/login")
 def login():
+    if "user" in session:
+        return redirect(url_for("index"))
+    
     # Construct the authorization URL
     auth_url = (
         f"https://login.microsoftonline.com/organizations/oauth2/v2.0/authorize?"
@@ -24,5 +29,13 @@ def login():
     )
     return redirect(auth_url)
 
+@app.route("/callback")
+def callback():
+    token = request.args.get("token")
+    if token:
+        session["user"] = token  # Here, you can store the user's information in the session
+    return redirect(url_for("index"))
+
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    app.run(host="0.0.0.0", port=8000)
+
