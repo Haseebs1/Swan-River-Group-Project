@@ -38,18 +38,22 @@ def login():
     return redirect(authorization_url)
 
 @app.route('/login/authorized')
+@app.route('/login/authorized')
 def authorized():
     try:
+        app.logger.info("Starting OAuth token fetch")
         token = oauth.fetch_token(
             f'{AUTHORITY}/oauth2/v2.0/token',
             client_secret=CLIENT_SECRET,
             authorization_response=request.url
         )
         session['oauth_token'] = token
+        app.logger.info("Token fetched successfully")
 
         # Fetch user info
         graph_client = OAuth2Session(CLIENT_ID, token=token)
         user_info = graph_client.get('https://graph.microsoft.com/v1.0/me').json()
+        app.logger.info("User info fetched: %s", user_info)
         session['user_name'] = user_info['displayName']
         session['user_email'] = user_info['mail']  # Store user email in session
 
@@ -57,8 +61,8 @@ def authorized():
         return redirect(url_for('admin'))
 
     except Exception as e:
-        print("Error during authorization:", str(e))  # Debug: Print the error
-        return "Internal Server Error"
+        app.logger.error("Error during authorization: %s", str(e))  # Log the error
+        return "Internal Server Error", 500
 
 
 # Admin route (protected)
