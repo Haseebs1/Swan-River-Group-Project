@@ -6,7 +6,7 @@ import os
 # Allow insecure transport during development
 os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 
-app = Flask(__name__, template_folder='docs')
+app = Flask(__name__, static_folder="docs", template_folder="docs")
 app.secret_key = 'swanRiver'  # Replace with a real secret key
 app.config['SESSION_TYPE'] = 'filesystem'
 Session(app)
