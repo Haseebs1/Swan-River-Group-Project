@@ -10,7 +10,8 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 # Home route
 @app.route("/")
 def home():
-    app.logger.debug("Rendering index.html")
+    if current_user.is_authenticated:
+        return redirect(url_for('admin'))  # Redirect authenticated users to admin
     return render_template("index.html")
 
 # Azure AD configuration
@@ -26,15 +27,6 @@ oauth = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
-
-# Dummy user class for Flask-Login
-class User(UserMixin):
-    def __init__(self, user_id):
-        self.id = user_id
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User(user_id)
 
 # Microsoft authentication route
 @app.route('/login')
