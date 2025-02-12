@@ -1,5 +1,4 @@
 from flask import Flask, redirect, url_for, session, render_template, request
-from flask_login import LoginManager, UserMixin, login_user, login_required, logout_user
 import msal
 import uuid
 from requests_oauthlib import OAuth2Session
@@ -10,8 +9,6 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 # Home route
 @app.route("/")
 def home():
-    if current_user.is_authenticated:
-        return redirect(url_for('admin'))  # Redirect authenticated users to admin
     return render_template("index.html")
 
 # Azure AD configuration
