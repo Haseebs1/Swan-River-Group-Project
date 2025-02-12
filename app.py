@@ -11,8 +11,8 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD app's Client ID
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
 TENANT_ID = "170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"  # Replace with your Azure AD Tenant ID
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-REDIRECT_PATH = "/login/callback"  # Must match the redirect URI in Azure AD
+AUTHORITY = f"https://login.microsoftonline.com/170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"
+REDIRECT_PATH = "/login"  # Must match the redirect URI in Azure AD
 SCOPE = ["User.Read"]  # Permissions to request
 
 # Flask-Login setup
