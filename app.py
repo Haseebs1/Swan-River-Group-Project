@@ -4,8 +4,10 @@ import uuid
 from requests_oauthlib import OAuth2Session
 
 app = Flask(__name__, static_folder="docs", template_folder="docs")
-app.secret_key = "your_secret_key"  # Replace with a secure secret key
+app.secret_key = "Swan-Rivers"  # Replace with a secure secret key
 
+# Allow insecure transport during development
+os.environ['OAUTHLIB_INSECURE_TRANSPORT'] = '1'
 # Home route
 @app.route("/")
 def home():
