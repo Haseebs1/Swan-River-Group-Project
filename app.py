@@ -30,12 +30,14 @@ def load_user(user_id):
 # Microsoft authentication route
 @app.route("/login")
 def login():
+    print("Login route called")  # Debugging statement
     session["state"] = str(uuid.uuid4())
     auth_url = _build_auth_url(scopes=SCOPE, state=session["state"])
+    print("Auth URL:", auth_url)  # Debugging statement
     return redirect(auth_url)
 
 # Callback route for Microsoft authentication
-@app.route(REDIRECT_PATH)
+@app.route("/login/callback")
 def authorized():
     if request.args.get("state") != session.get("state"):
         return redirect(url_for("home"))  # Invalid state, redirect to home
