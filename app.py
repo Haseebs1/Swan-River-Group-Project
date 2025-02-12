@@ -10,10 +10,11 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD app's Client ID
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
 TENANT_ID = "170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"  # Replace with your Azure AD Tenant ID
-AUTHORITY = f"https://login.microsoftonline.com/170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"
-REDIRECT_PATH = "/login/callback"  # Must match the redirect URI in Azure AD
+AUTHORITY = f"https://login.microsoftonline.com/common"
+REDIRECT_PATH = "https://swanriver-hpchbdasddbqfxd4.centralus-01.azurewebsites.net/docs/login.html/login/authorized"  # Must match the redirect URI in Azure AD
 SCOPE = ["User.Read"]  # Permissions to request
-
+# OAuth2 session
+oauth = OAuth2Session(CLIENT_ID, redirect_uri=REDIRECT_URI, scope=SCOPE)
 # Flask-Login setup
 login_manager = LoginManager()
 login_manager.init_app(app)
@@ -37,25 +38,99 @@ def login():
     return redirect(auth_url)
 
 # Callback route for Microsoft authentication
-@app.route("/login/callback")
+@app.route('/login/authorized')
 def authorized():
-    if request.args.get("state") != session.get("state"):
-        return redirect(url_for("home"))  # Invalid state, redirect to home
-    if "error" in request.args:  # Authentication failed
-        return f"Error: {request.args['error_description']}"
-    if "code" in request.args:  # Authentication succeeded
-        result = _acquire_token_by_auth_code_flow(request.args)
-        if "error" in result:
-            return f"Error: {result['error_description']}"
-        user = User(result["id_token_claims"]["oid"])  # Create user from Azure AD ID
-        login_user(user)
-        return redirect(url_for("admin"))  # Redirect to admin page
+    try:
+        token = oauth.fetch_token(
+            f'{AUTHORITY}/oauth2/v2.0/token',
+            client_secret=CLIENT_SECRET,
+            authorization_response=request.url
+        )
+        session['oauth_token'] = token
 
-# Admin route (protected)
-@app.route("/admin")
-@login_required
+        # Fetch user info
+        graph_client = OAuth2Session(CLIENT_ID, token=token)
+        user_info = graph_client.get('https://graph.microsoft.com/v1.0/me').json()
+        session['user_name'] = user_info['displayName']
+        session['user_email'] = user_info['mail']  # Store user email in session
+
+        # Check if the user is an admin based on email domain
+        user_email = session.get('user_email', '').lower()
+        is_admin = user_email.endswith('@example.com')  # Replace with your organization's domain
+
+        # Redirect based on user role
+        if is_admin:
+            return redirect(url_for('admin'))
+        else:
+            return redirect(url_for('basic_user_home'))
+
+    except Exception as e:
+        print("Error during authorization:", str(e))  # Debug: Print the error
+        return "Internal Server Error"
+
+@app.route('/admin')
 def admin():
-    return render_template("admin.html")
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+    user_name = session.get('user_name', 'Guest')
+    return render_template('admin.html', user_name=user_name)
+
+@app.route('/basic_user_home')
+def basic_user_home():
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+    user_name = session.get('user_name', 'Guest')
+    return render_template('basic_user_home.html', user_name=user_name)
+
+@app.route('/view_profile')
+def view_profile():
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+    user_name = session.get('user_name', 'Guest')
+    user_email = session.get('user_email', 'guest@example.com')
+    return render_template('basic_user_view.html', user_name=user_name, user_email=user_email)
+
+@app.route('/edit_profile')
+def edit_profile():
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+    user_name = session.get('user_name', 'Guest')
+    user_email = session.get('user_email', 'guest@example.com')
+    return render_template('basic_user_edit.html', user_name=user_name, user_email=user_email)
+
+@app.route('/update_profile', methods=['POST'])
+def update_profile():
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+    user_name = session.get('user_name', 'Guest')
+    user_email = request.form.get('email')
+
+    # Update the user email in the session
+    session['user_email'] = user_email
+
+    # Here you can add code to update the user profile in the database or any other storage
+
+    return redirect(url_for('basic_user_home'))
+
+@app.route('/view_emails')
+def view_emails():
+    if 'oauth_token' not in session:
+        return redirect(url_for('home'))  # Redirect to login if not authenticated
+
+    token = session.get('oauth_token')
+    graph_client = OAuth2Session(CLIENT_ID, token=token)
+
+    # Fetch email info
+    response = graph_client.get('https://graph.microsoft.com/v1.0/me/messages').json()
+    print("Response from Graph API:", response)  # Debug: Print the full response
+
+    email_list = []
+    if 'value' in response:
+        email_list = [email['subject'] for email in response['value']]  # Example: Fetch email subjects
+    else:
+        print("Key 'value' not found in the response")
+
+    return render_template('emails.html', emails=email_list)
 
 # Logout route
 @app.route("/logout")
