@@ -53,16 +53,13 @@ def authorized():
         session['user_name'] = user_info['displayName']
         session['user_email'] = user_info['mail']  # Store user email in session
 
-        # Check if the user is an admin based on email domain
-        user_email = session.get('user_email', '').lower()
-        is_admin = user_email.endswith('@example.com')  # Replace with your organization's domain
-
-        # Redirect based on user role
-            return redirect(url_for('admin')
+        # Always redirect to admin route
+        return redirect(url_for('admin'))
 
     except Exception as e:
         print("Error during authorization:", str(e))  # Debug: Print the error
         return "Internal Server Error"
+
 
 # Admin route (protected)
 @app.route("/admin")
