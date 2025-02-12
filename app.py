@@ -130,21 +130,5 @@ def logout():
     session.clear()
     return redirect(url_for("home"))
 
-# Helper functions for Microsoft authentication
-def _build_auth_url(scopes=None, state=None):
-    return msal.PublicClientApplication(
-        CLIENT_ID, authority=AUTHORITY
-    ).get_authorization_request_url(scopes, state=state, redirect_uri=url_for("authorized", _external=True))
-
-def _acquire_token_by_auth_code_flow(request_args):
-    cache = msal.SerializableTokenCache()
-    app = msal.ConfidentialClientApplication(
-        CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET, token_cache=cache
-    )
-    result = app.acquire_token_by_authorization_code(
-        request_args["code"], scopes=SCOPE, redirect_uri=url_for("authorized", _external=True)
-    )
-    return result
-
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=8000)
