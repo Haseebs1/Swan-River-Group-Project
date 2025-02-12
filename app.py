@@ -1,6 +1,7 @@
 from flask import Flask, redirect, url_for, session, render_template, request
 import msal
 import uuid
+import os
 from requests_oauthlib import OAuth2Session
 
 app = Flask(__name__, static_folder="docs", template_folder="docs")
