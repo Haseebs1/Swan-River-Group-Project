@@ -10,7 +10,9 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 # Home route
 @app.route("/")
 def home():
+    app.logger.debug("Rendering index.html")
     return render_template("index.html")
+
 # Azure AD configuration
 CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD app's Client ID
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
