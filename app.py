@@ -11,8 +11,8 @@ app.secret_key = "your_secret_key"  # Replace with a secure secret key
 CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD app's Client ID
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
 TENANT_ID = "170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"  # Replace with your Azure AD Tenant ID
-AUTHORITY = f"https://login.microsoftonline.com/170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"
-REDIRECT_URI= "https://swanriver-hpchbdasddbqfxd4.centralus-01.azurewebsites.net/login/authorized"  # Must match the redirect URI in Azure AD
+AUTHORITY = f"https://login.microsoftonline.com/common"
+REDIRECT_URI= "https://swanriver-hpchbdasddbqfxd4.centralus-01.azurewebsites.net/docs/login/authorized"  # Must match the redirect URI in Azure AD
 SCOPE = ["User.Read"]  # Permissions to request
 
 # OAuth2 session
