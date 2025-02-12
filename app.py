@@ -38,7 +38,6 @@ def login():
     return redirect(authorization_url)
 
 @app.route('/login/authorized')
-@app.route('/login/authorized')
 def authorized():
     try:
         app.logger.info("Starting OAuth token fetch")
