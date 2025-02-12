@@ -12,7 +12,7 @@ CLIENT_ID = "920e0dcb-6b9b-4ae1-8038-8b57c277dec3"  # Replace with your Azure AD
 CLIENT_SECRET = "Kxb8Q~PV~cRSKJYeVjLi9YFWoFFjhsNWT4P.Ydcb"  # Replace with your Azure AD app's Client Secret
 TENANT_ID = "170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"  # Replace with your Azure AD Tenant ID
 AUTHORITY = f"https://login.microsoftonline.com/170bbabd-a2f0-4c90-ad4b-0e8f0f0c4259"
-REDIRECT_PATH = "/login"  # Must match the redirect URI in Azure AD
+REDIRECT_PATH = "http://swanriver-hpchbdasddbqfxd4.centralus-01.azurewebsites.net/login/authorized"  # Must match the redirect URI in Azure AD
 SCOPE = ["User.Read"]  # Permissions to request
 
 # Flask-Login setup
@@ -29,28 +29,38 @@ def load_user(user_id):
     return User(user_id)
 
 # Microsoft authentication route
-@app.route("/login")
+@app.route('/login')
 def login():
-    print("Login route called")  # Debugging statement
-    session["state"] = str(uuid.uuid4())
-    auth_url = _build_auth_url(scopes=SCOPE, state=session["state"])
-    print("Auth URL:", auth_url)  # Debugging statement
-    return redirect(auth_url)
+    authorization_url, state = oauth.authorization_url(f'{AUTHORITY}/oauth2/v2.0/authorize')
+    session['oauth_state'] = state
+    return redirect(authorization_url)
 
-# Callback route for Microsoft authentication
-@app.route(REDIRECT_PATH)
+@app.route('/login/authorized')
 def authorized():
-    if request.args.get("state") != session.get("state"):
-        return redirect(url_for("home"))  # Invalid state, redirect to home
-    if "error" in request.args:  # Authentication failed
-        return f"Error: {request.args['error_description']}"
-    if "code" in request.args:  # Authentication succeeded
-        result = _acquire_token_by_auth_code_flow(request.args)
-        if "error" in result:
-            return f"Error: {result['error_description']}"
-        user = User(result["id_token_claims"]["oid"])  # Create user from Azure AD ID
-        login_user(user)
-        return redirect(url_for("admin"))  # Redirect to admin page
+    try:
+        token = oauth.fetch_token(
+            f'{AUTHORITY}/oauth2/v2.0/token',
+            client_secret=CLIENT_SECRET,
+            authorization_response=request.url
+        )
+        session['oauth_token'] = token
+
+        # Fetch user info
+        graph_client = OAuth2Session(CLIENT_ID, token=token)
+        user_info = graph_client.get('https://graph.microsoft.com/v1.0/me').json()
+        session['user_name'] = user_info['displayName']
+        session['user_email'] = user_info['mail']  # Store user email in session
+
+        # Check if the user is an admin based on email domain
+        user_email = session.get('user_email', '').lower()
+        is_admin = user_email.endswith('@example.com')  # Replace with your organization's domain
+
+        # Redirect based on user role
+            return redirect(url_for('admin')
+
+    except Exception as e:
+        print("Error during authorization:", str(e))  # Debug: Print the error
+        return "Internal Server Error"
 
 # Admin route (protected)
 @app.route("/admin")
