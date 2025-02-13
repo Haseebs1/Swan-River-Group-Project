@@ -13,10 +13,19 @@
 
     <title>Swan River Group Project</title>
 
-    <link rel="icon" type="image/png" href="/images/swan.png">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="icon" type="image/png" href="{{ url_for('static', filename='images/swan.png') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='styles.css') }}">
     <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;700&display=swap" rel="stylesheet">
 
+    <script src="{{ url_for('static', filename='script.js') }}" defer></script>
+    <script>
+        function redirectToAdmin() {
+            window.location.href = "/success";
+        }
+        function redirectToEditProfile() {
+        window.location.href = "/admin-edit-profile";
+    }
+    </script>
     <script src="script.js" defer></script>
 </head>
 
@@ -27,8 +36,8 @@
         <p>Email: <span id="userEmail"></span></p>
         <p>Role: <span id="userRole"></span></p>
         <p>Status: <span id="userStatus"></span></p><br>
-        <a class="login-btn" href="admin-edit-profile.html">Edit Profile</a>
-        <a class="login-btn" href="admin.html">Back to Home</a>
+        <button class="back" onclick="redirectToEditProfile()">Edit Profile</a>
+        <button class="back" onclick="redirectToAdmin()">Back to Home</a>
     </div>
 
     <script src="profile.js"></script>
