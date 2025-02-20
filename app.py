@@ -185,34 +185,26 @@ if __name__ == '__main__':
         db.create_all()
     app.run(host='0.0.0.0', port=5000)'''
 
-from flask import Flask
+from flask import Flask, jsonify
 import pyodbc
 
 app = Flask(__name__)
 
-# Build connection string
+# Your database connection string
 conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 
-# Create connection
-def get_db_connection():
-    try:
-        conn = pyodbc.connect(conn_string)
-        return conn
-    except pyodbc.Error as e:
-        print(f"Error connecting to the database: {e}")
-        return None
-
 @app.route('/')
-def index():
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM User")  # Replace with your table name
-        rows = cursor.fetchall()
-        conn.close()
-        return f"Fetched {len(rows)} rows from the database."
-    else:
-        return "Failed to connect to the database."
+def test_db_connection():
+    try:
+        with pyodbc.connect(conn_string) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            if result:
+                return jsonify({'message': 'Database connection successful', 'result': result[0]})
+    except Exception as e:
+        return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(debug=True)
+
