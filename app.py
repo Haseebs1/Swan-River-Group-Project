@@ -194,7 +194,7 @@ app = Flask(__name__)
 server = "tcp:swan-river123.database.windows.net,1433"
 database = "Swan-River"
 username = "swanriver"
-password = "<H1ghLander>"
+password = "<Admin123>"
 driver = "{ODBC Driver 18 for SQL Server}"
 
 # Build connection string
