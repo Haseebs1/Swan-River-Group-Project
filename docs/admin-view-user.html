@@ -20,10 +20,10 @@
     <script src="{{ url_for('static', filename='script.js') }}" defer></script>
     <script src="script.js" defer></script>
     <script>
-      function redirectToAdmin() {
-          window.location.href = "/success";
-      }
-      </script>
+        function redirectToAdmin() {
+            window.location.href = "/success";
+        }
+    </script>
 </head>
 
 <body class="userList">
@@ -39,50 +39,38 @@
                 </tr>
             </thead>
             <tbody id="userList">
-                <!-- User rows will be inserted dynamically -->
+                {% for user in users %}
+                <tr>
+                    <td>{{ user.Name }}</td>
+                    <td>{{ user.Email }}</td>
+                    <td>{{ user.Role }}</td>
+                    <td>{{ user.Status }}</td>
+                </tr>
+                {% endfor %}
             </tbody>
         </table>
     </div>
 
-    <button class="back" onclick="redirectToAdmin()">Back to Home</a>
+    <button class="back" onclick="redirectToAdmin()">Back to Home</button>
 
     <script>
-        // Example users
-        const users = [
-          { name: 'John Williams', email: 'jcwill23@cougarnet.uh.edu', role: 'admin', status: 'active' },
-          { name: 'John Doe', email: 'johndoe@email.com', role: 'basicuser', status: 'active'}
-        ];
-    
-        // Render user list into the table
-        function renderUserList(users) {
-          const userListElement = document.getElementById('userList');
-          userListElement.innerHTML = users.map(user => `
-            <tr>
-              <td>${user.name}</td>
-              <td>${user.email}</td>
-              <td>${user.role}</td>
-              <td>${user.status}</td>
-            </tr>
-          `).join('');
-        }
-    
-        // Initial rendering
-        renderUserList(users);
-    
         // Sorting function
         function sortTable(columnIndex) {
-          const rows = Array.from(document.querySelectorAll("#userList tr"));
-          
-          const sortedRows = rows.sort((rowA, rowB) => {
-            const cellA = rowA.children[columnIndex].textContent.trim().toLowerCase();
-            const cellB = rowB.children[columnIndex].textContent.trim().toLowerCase();
-    
-            return cellA > cellB ? 1 : cellA < cellB ? -1 : 0;
-          });
-    
-          // Clear the table and append sorted rows
-          document.getElementById('userList').innerHTML = '';
-          sortedRows.forEach(row => document.getElementById('userList').appendChild(row));
+            const rows = Array.from(document.querySelectorAll("#userList tr"));
+
+            const sortedRows = rows.sort((rowA, rowB) => {
+                const cellA = rowA.children[columnIndex].textContent.trim().toLowerCase();
+                const cellB = rowB.children[columnIndex].textContent.trim().toLowerCase();
+
+                return cellA > cellB ? 1 : cellA < cellB ? -1 : 0;
+            });
+
+            // Clear the table and append sorted rows
+            document.getElementById('userList').innerHTML = '';
+            sortedRows.forEach(row => document.getElementById('userList').appendChild(row));
         }
-      </script>
+    </script>
+</body>
+
+</html>
 
