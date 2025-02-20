@@ -190,15 +190,8 @@ import pyodbc
 
 app = Flask(__name__)
 
-# Database connection details
-server = "tcp:swan-river123.database.windows.net"
-database = "Swan-River"
-username = "swanriver"
-password = "<Admin123>"
-driver = "{ODBC Driver 18 for SQL Server}"
-
 # Build connection string
-conn_string = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 
 # Create connection
 def get_db_connection():
@@ -222,4 +215,4 @@ def index():
         return "Failed to connect to the database."
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=1433)
+    app.run(host='0.0.0.0', port=5000)
