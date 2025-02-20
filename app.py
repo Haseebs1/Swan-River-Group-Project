@@ -191,7 +191,7 @@ import pyodbc
 app = Flask(__name__)
 
 # Database connection details
-server = "tcp:swan-river123.database.windows.net,1433"
+server = "tcp:swan-river123.database.windows.net"
 database = "Swan-River"
 username = "swanriver"
 password = "<Admin123>"
@@ -222,4 +222,4 @@ def index():
         return "Failed to connect to the database."
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    app.run(host='0.0.0.0', port=1433)
