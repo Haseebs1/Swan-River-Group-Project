@@ -1,6 +1,6 @@
 from flask import Flask, redirect, url_for, session, request, render_template
+from flask_sqlalchemy import SQLAlchemy
 import msal
-import pyodbc
 import requests
 import os
 from dotenv import load_dotenv
@@ -21,23 +21,25 @@ REDIRECT_URI = os.getenv('REDIRECT_URI')
 SCOPE = ['User.Read']
 
 # Azure SQL Database configuration
-SERVER = os.getenv('AZURE_SQL_SERVER')
-DATABASE = os.getenv('AZURE_SQL_DATABASE')
-USERNAME = os.getenv('AZURE_SQL_USERNAME')
-PASSWORD = os.getenv('AZURE_SQL_PASSWORD')
-DRIVER = '{ODBC Driver 18 for SQL Server}'  # Use the appropriate driver
+app.config['SQLALCHEMY_DATABASE_URI'] = (
+    f"mssql+pyodbc://{os.getenv('AZURE_SQL_USERNAME')}:{os.getenv('AZURE_SQL_PASSWORD')}@"
+    f"{os.getenv('AZURE_SQL_SERVER')}/{os.getenv('AZURE_SQL_DATABASE')}?"
+    "driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
+)
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
-# Connection string
-connection_string = f"DRIVER={DRIVER};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+# Initialize SQLAlchemy
+db = SQLAlchemy(app)
 
-# Function to get a database connection
-def get_db_connection():
-    try:
-        conn = pyodbc.connect(connection_string)
-        return conn
-    except Exception as e:
-        print(f"Error connecting to the database: {e}")
-        return None
+# Define the User model
+class User(db.Model):
+    __tablename__ = 'User'  # Explicitly sets table name to match table in Azure database
+
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(100), nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
+    role = db.Column(db.String(50), default="basicuser")
+    status = db.Column(db.String(20), default="active")
 
 # Home page
 @app.route('/')
@@ -93,6 +95,7 @@ def admin_view_profile():
     user_name = session['user']['displayName']
     return render_template('admin-view-profile.html', user_name=user_name)
 
+# Admin edit profile page
 @app.route('/admin-edit-profile')
 def admin_edit_profile():
     if not session.get('user'):
@@ -100,6 +103,7 @@ def admin_edit_profile():
     user_name = session['user']['displayName']
     return render_template('admin-edit-profile.html', user_name=user_name)
 
+# Admin create user page
 @app.route('/admin-create-user')
 def admin_create_user():
     if not session.get('user'):
@@ -107,13 +111,24 @@ def admin_create_user():
     user_name = session['user']['displayName']
     return render_template('admin-create-user.html', user_name=user_name)
 
+# Admin view users page
 @app.route('/admin-view-user')
 def admin_view_user():
     if not session.get('user'):
         return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-view-user.html', user_name=user_name)
 
+    try:
+        # Fetch all users from the database
+        users = User.query.all()
+        user_name = session['user']['displayName']
+        return render_template('admin-view-user.html', user_name=user_name, users=users)
+
+    except Exception as e:
+        # Log any errors
+        print(f"Error fetching users: {e}")
+        return "An error occurred while fetching users.", 500
+
+# Admin update user page
 @app.route('/admin-update-user')
 def admin_update_user():
     if not session.get('user'):
@@ -121,6 +136,7 @@ def admin_update_user():
     user_name = session['user']['displayName']
     return render_template('admin-update-user.html', user_name=user_name)
 
+# Admin delete user page
 @app.route('/admin-delete-user')
 def admin_delete_user():
     if not session.get('user'):
@@ -163,18 +179,8 @@ def _get_user_info(token):
         print(f"Error fetching user info: {e}")
         return None
 
-# Example route to fetch data from the database
-@app.route('/data')
-def fetch_data():
-    conn = get_db_connection()
-    if conn:
-        cursor = conn.cursor()
-        cursor.execute("SELECT * FROM your_table_name")  # Replace with your table name
-        rows = cursor.fetchall()
-        conn.close()
-        return render_template('data.html', rows=rows)
-    else:
-        return "Failed to connect to the database."
-
 if __name__ == '__main__':
+    # Create database tables (if they don't exist)
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=5000)
