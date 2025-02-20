@@ -1,9 +1,9 @@
-
 from flask import Flask, redirect, url_for, session, request, render_template
 import msal
+import pyodbc
 import requests
-from dotenv import load_dotenv
 import os
+from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
@@ -20,6 +20,25 @@ AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 REDIRECT_URI = os.getenv('REDIRECT_URI')
 SCOPE = ['User.Read']
 
+# Azure SQL Database configuration
+SERVER = os.getenv('AZURE_SQL_SERVER')
+DATABASE = os.getenv('AZURE_SQL_DATABASE')
+USERNAME = os.getenv('AZURE_SQL_USERNAME')
+PASSWORD = os.getenv('AZURE_SQL_PASSWORD')
+DRIVER = '{ODBC Driver 18 for SQL Server}'  # Use the appropriate driver
+
+# Connection string
+connection_string = f"DRIVER={DRIVER};SERVER={SERVER};DATABASE={DATABASE};UID={USERNAME};PWD={PASSWORD};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+
+# Function to get a database connection
+def get_db_connection():
+    try:
+        conn = pyodbc.connect(connection_string)
+        return conn
+    except Exception as e:
+        print(f"Error connecting to the database: {e}")
+        return None
+
 # Home page
 @app.route('/')
 def index():
@@ -33,50 +52,34 @@ def login():
 # Initiate Microsoft 365 login
 @app.route('/azure_login')
 def azure_login():
-    session['state'] = 'random_state'  # Use a random state for security
+    session['state'] = os.urandom(16).hex()  # Generate a random state for security
     auth_url = _build_auth_url(scopes=SCOPE, state=session['state'])
-    print("Authorization URL:", auth_url)  # Debugging
     return redirect(auth_url)
 
 # Callback route after Microsoft 365 login
 @app.route('/auth/callback')
 def authorized():
-    print("Callback route called")  # Debugging
-    try:
-        if request.args.get('state') != session.get('state'):
-            print("State mismatch")  # Debugging
-            return redirect(url_for('index'))  # Prevent CSRF attacks
+    if request.args.get('state') != session.get('state'):
+        return redirect(url_for('index'))  # Prevent CSRF attacks
 
-        # Get the authorization code from the request
-        code = request.args.get('code')
-        if not code:
-            print("Authorization code not found")  # Debugging
-            return redirect(url_for('index'))
-
-        # Get the access token
-        token = _get_token_from_code(code)
-        if not token:
-            print("Failed to get access token")  # Debugging
-            return redirect(url_for('index'))
-
-        # Get user info from Microsoft Graph
-        user_info = _get_user_info(token)
-        if not user_info:
-            print("Failed to get user info")  # Debugging
-            return redirect(url_for('index'))
-
-        # Store user info in session
-        session['user'] = user_info
-        return redirect(url_for('success'))
-
-    except Exception as e:
-        print(f"Error in callback route: {e}")  # Debugging
+    code = request.args.get('code')
+    if not code:
         return redirect(url_for('index'))
+
+    token = _get_token_from_code(code)
+    if not token:
+        return redirect(url_for('index'))
+
+    user_info = _get_user_info(token)
+    if not user_info:
+        return redirect(url_for('index'))
+
+    session['user'] = user_info
+    return redirect(url_for('success'))
 
 # Success page after login
 @app.route('/success')
 def success():
-    print("Success route called")  # Debugging
     if not session.get('user'):
         return redirect(url_for('index'))
     user_name = session['user']['displayName']
@@ -140,32 +143,38 @@ def _build_auth_url(scopes=None, state=None):
 # Helper function to get the access token
 def _get_token_from_code(code):
     try:
-        # Initialize the MSAL client
         client = msal.ConfidentialClientApplication(
             CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET)
-
-        # Acquire the token using the authorization code
         result = client.acquire_token_by_authorization_code(
             code, scopes=SCOPE, redirect_uri=REDIRECT_URI)
-
-        # Check if the token was acquired successfully
-        if "access_token" in result:
-            print("Access token acquired successfully")  # Debugging
-            return result["access_token"]
-        else:
-            print("Failed to acquire access token. Response:", result)  # Debugging
-            return None
-
+        return result.get('access_token')
     except Exception as e:
-        print(f"Error acquiring token: {e}")  # Debugging
+        print(f"Error acquiring token: {e}")
         return None
 
 # Helper function to get user info from Microsoft Graph
 def _get_user_info(token):
-    graph_data = requests.get(
-        'https://graph.microsoft.com/v1.0/me',
-        headers={'Authorization': 'Bearer ' + token}).json()
-    return graph_data
+    try:
+        graph_data = requests.get(
+            'https://graph.microsoft.com/v1.0/me',
+            headers={'Authorization': 'Bearer ' + token}).json()
+        return graph_data
+    except Exception as e:
+        print(f"Error fetching user info: {e}")
+        return None
+
+# Example route to fetch data from the database
+@app.route('/data')
+def fetch_data():
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM your_table_name")  # Replace with your table name
+        rows = cursor.fetchall()
+        conn.close()
+        return render_template('data.html', rows=rows)
+    else:
+        return "Failed to connect to the database."
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
