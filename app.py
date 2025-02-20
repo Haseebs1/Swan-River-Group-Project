@@ -1,4 +1,4 @@
-from flask import Flask, redirect, url_for, session, request, render_template
+'''from flask import Flask, redirect, url_for, session, request, render_template
 from flask_sqlalchemy import SQLAlchemy
 import msal
 import requests
@@ -183,4 +183,43 @@ if __name__ == '__main__':
     # Create database tables (if they don't exist)
     with app.app_context():
         db.create_all()
+    app.run(host='0.0.0.0', port=5000)'''
+
+from flask import Flask
+import pyodbc
+
+app = Flask(__name__)
+
+# Database connection details
+server = "tcp:swan-river123.database.windows.net,1433"
+database = "Swan-River"
+username = "swanriver"
+password = "<H1ghLander>"
+driver = "{ODBC Driver 18 for SQL Server}"
+
+# Build connection string
+conn_string = f"DRIVER={driver};SERVER={server};DATABASE={database};UID={username};PWD={password};Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+
+# Create connection
+def get_db_connection():
+    try:
+        conn = pyodbc.connect(conn_string)
+        return conn
+    except pyodbc.Error as e:
+        print(f"Error connecting to the database: {e}")
+        return None
+
+@app.route('/')
+def index():
+    conn = get_db_connection()
+    if conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM User")  # Replace with your table name
+        rows = cursor.fetchall()
+        conn.close()
+        return f"Fetched {len(rows)} rows from the database."
+    else:
+        return "Failed to connect to the database."
+
+if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
