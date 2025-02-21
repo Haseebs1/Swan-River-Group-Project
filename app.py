@@ -84,6 +84,13 @@ def success():
     user_name = session['user']['displayName']
     return render_template('admin.html', user_name=user_name)
 
+@app.route('/admin-view-profile')
+def admin_view_profile():
+    if not session.get('user'):
+        return redirect(url_for('index'))  # Redirect to login if not logged in
+    user_name = session['user']['displayName']
+    return render_template('admin_view_profile.html', user_name=user_name)
+
 # CRUD routes for User model
 
 # Create User
@@ -173,28 +180,4 @@ if __name__ == '__main__':
     with app.app_context():
         db.create_all()
     app.run(host='0.0.0.0', port=5000)
-
-
-'''from flask import Flask, jsonify
-import pyodbc
-
-app = Flask(__name__)
-
-# Your database connection string
-conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
-
-@app.route('/')
-def test_db_connection():
-    try:
-        with pyodbc.connect(conn_string) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            if result:
-                return jsonify({'message': 'Database connection successful', 'result': result[0]})
-    except Exception as e:
-        return jsonify({'error': str(e)})
-
-if __name__ == '__main__':
-    app.run(debug=True)'''
 
