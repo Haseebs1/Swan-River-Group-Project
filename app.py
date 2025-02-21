@@ -88,8 +88,21 @@ def success():
 def admin_view_profile():
     if not session.get('user'):
         return redirect(url_for('index'))  # Redirect to login if not logged in
-    user_name = session['user']['displayName']
-    return render_template('admin-view-profile.html', user_name=user_name)
+
+    # Get the user's email from the session (assuming it's stored during login)
+    user_email = session['user'].get('mail')  # or 'userPrincipalName' depending on Azure AD response
+
+    # Fetch the user's details from the database
+    user = User.query.filter_by(email=user_email).first()
+    if not user:
+        return redirect(url_for('index'))  # Redirect if user not found in the database
+
+    # Pass all user details to the template
+    return render_template('admin_view_profile.html', 
+                           user_name=user.name, 
+                           user_email=user.email, 
+                           user_role=user.role, 
+                           user_status=user.status)
 
 # CRUD routes for User model
 
