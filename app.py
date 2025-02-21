@@ -236,7 +236,7 @@ def _get_user_info(token):
         return graph_data
     except Exception as e:
         print(f"Error fetching user info: {e}")
-        return 
+        return None
 
 if __name__ == '__main__':
     # Create database tables (if they don't exist)
