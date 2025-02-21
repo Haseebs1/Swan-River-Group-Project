@@ -39,6 +39,16 @@ class User(db.Model):
     role = db.Column(db.String(50), default="basicuser")
     status = db.Column(db.String(20), default="active")
 
+"active")
+
+# Check if user is logged in
+def login_required(f):
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return redirect(url_for('login'))
+        return f(*args, **kwargs)
+    return decorated_function
+
 # Home page
 @app.route('/')
 def index():
@@ -86,9 +96,8 @@ def success():
     return render_template('admin.html', user_name=user_name)
 
 # CRUD routes for User model
-
-# Create User
 @app.route('/user', methods=['POST'])
+@login_required
 def create_user():
     data = request.get_json()
     new_user = User(name=data['name'], email=data['email'], role=data.get('role', 'basicuser'), status=data.get('status', 'active'))
@@ -96,15 +105,15 @@ def create_user():
     db.session.commit()
     return jsonify({'message': 'User created successfully'}), 201
 
-# Read Users
 @app.route('/users', methods=['GET'])
+@login_required
 def get_users():
     users = User.query.all()
     user_list = [{'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role, 'status': user.status} for user in users]
     return jsonify(user_list)
 
-# Update User
 @app.route('/user/<int:id>', methods=['PUT'])
+@login_required
 def update_user(id):
     data = request.get_json()
     user = User.query.get(id)
@@ -117,8 +126,8 @@ def update_user(id):
     db.session.commit()
     return jsonify({'message': 'User updated successfully'})
 
-# Delete User
 @app.route('/user/<int:id>', methods=['DELETE'])
+@login_required
 def delete_user(id):
     user = User.query.get(id)
     if not user:
@@ -129,6 +138,7 @@ def delete_user(id):
 
 # Route to test database connection
 @app.route('/test-db-connection')
+@login_required
 def test_db_connection():
     try:
         with pyodbc.connect(conn_string) as conn:
@@ -139,6 +149,65 @@ def test_db_connection():
                 return jsonify({'message': 'Database connection successful', 'result': result[0]})
     except Exception as e:
         return jsonify({'error': str(e), 'connection_string': conn_string})
+
+# Routes for HTML templates
+@app.route('/admin-create-user')
+@login_required
+def admin_create_user():
+    return render_template('admin-create-user.html')
+
+@app.route('/admin-delete-user')
+@login_required
+def admin_delete_user():
+    return render_template('admin-delete-user.html')
+
+@app.route('/admin-edit-profile')
+@login_required
+def admin_edit_profile():
+    return render_template('admin-edit-profile.html')
+
+@app.route('/admin-update-user')
+@login_required
+def admin_update_user():
+    return render_template('admin-update-user.html')
+
+@app.route('/admin-view-profile')
+@login_required
+def admin_view_profile():
+    return render_template('admin-view-profile.html')
+
+@app.route('/admin-view-user')
+@login_required
+def admin_view_user():
+    return render_template('admin-view-user.html')
+
+@app.route('/admin')
+@login_required
+def admin():
+    return render_template('admin.html')
+
+@app.route('/basic_user_edit')
+@login_required
+def basic_user_edit():
+    return render_template('basic_user_edit.html')
+
+@app.route('/basic_user_home')
+@login_required
+def basic_user_home():
+    return render_template('basic_user_home.html')
+
+@app.route('/basic_user_view')
+@login_required
+def basic_user_view():
+    return render_template('basic_user_view.html')
+
+@app.route('/index')
+def index_page():
+    return render_template('index.html')
+
+@app.route('/login')
+def login_page():
+    return render_template('login.html')
 
 # Helper function to build the authorization URL
 def _build_auth_url(scopes=None, state=None):
@@ -167,7 +236,7 @@ def _get_user_info(token):
         return graph_data
     except Exception as e:
         print(f"Error fetching user info: {e}")
-        return None
+        return 
 
 if __name__ == '__main__':
     # Create database tables (if they don't exist)
