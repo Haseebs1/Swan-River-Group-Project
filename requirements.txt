@@ -1,7 +1,10 @@
 Flask
-msal
+Flask-SQLAlchemy
+Flask-Session
+Authlib
 requests
 python-dotenv
-gunicorn
+msal
 pyodbc
-Flask-SQLAlchemy
+gunicorn
+simplejson
