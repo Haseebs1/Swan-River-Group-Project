@@ -73,7 +73,24 @@ def authorized():
     if not user_info:
         return redirect(url_for('index'))
 
+    # Store user info in session
     session['user'] = user_info
+
+    # Check if user exists in the database
+    user_email = user_info.get('mail')  # or 'userPrincipalName'
+    user = User.query.filter_by(email=user_email).first()
+
+    # If user doesn't exist, create a new user record
+    if not user:
+        new_user = User(
+            name=user_info.get('displayName'),
+            email=user_email,
+            role='basicuser',  # Default role
+            status='active'   # Default status
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
     return redirect(url_for('success'))
 
 # Success page after login
