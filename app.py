@@ -89,7 +89,7 @@ def admin_view_profile():
     if not session.get('user'):
         return redirect(url_for('index'))  # Redirect to login if not logged in
     user_name = session['user']['displayName']
-    return render_template('admin_view_profile.html', user_name=user_name)
+    return render_template('admin-view-profile.html', user_name=user_name)
 
 # CRUD routes for User model
 
