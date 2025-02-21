@@ -39,7 +39,6 @@ class User(db.Model):
     role = db.Column(db.String(50), default="basicuser")
     status = db.Column(db.String(20), default="active")
 
-"active")
 
 # Check if user is logged in
 def login_required(f):
