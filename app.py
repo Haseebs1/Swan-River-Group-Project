@@ -5,7 +5,7 @@ import os
 import pyodbc
 from dotenv import load_dotenv
 from flask_sqlalchemy import SQLAlchemy
-
+from flask_session import Session
 # Load environment variables
 load_dotenv()
 
@@ -40,203 +40,101 @@ class User(db.Model):
     status = db.Column(db.String(20), default="active")
 
 
-# Check if user is logged in
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'user' not in session:
-            return redirect(url_for('login'))
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Home page
+# Routes
 @app.route('/')
 def index():
     return render_template('index.html')
 
-# Login page
 @app.route('/login')
 def login():
     return render_template('login.html')
 
-# Initiate Microsoft 365 login
 @app.route('/azure_login')
 def azure_login():
-    session['state'] = os.urandom(16).hex()  # Generate a random state for security
+    session['state'] = 'random_state'
     auth_url = _build_auth_url(scopes=SCOPE, state=session['state'])
     return redirect(auth_url)
 
-# Callback route after Microsoft 365 login
 @app.route('/auth/callback')
 def authorized():
-    if request.args.get('state') != session.get('state'):
-        return redirect(url_for('index'))  # Prevent CSRF attacks
-
     code = request.args.get('code')
     if not code:
         return redirect(url_for('index'))
-
     token = _get_token_from_code(code)
-    if not token:
-        return redirect(url_for('index'))
-
     user_info = _get_user_info(token)
-    if not user_info:
-        return redirect(url_for('index'))
-
+    
+    # Check if the user exists in the database
+    user = User.query.filter_by(email=user_info['mail']).first()
+    if not user:
+        # Create a new user if not found
+        user = User(name=user_info['displayName'], email=user_info['mail'])
+    user.status = "active"  # Set the status to active
+    db.session.add(user)
+    db.session.commit()
+    
     session['user'] = user_info
-    return redirect(url_for('success'))
+    return redirect(url_for('basic_user_home'))
 
-# Success page after login
-@app.route('/success')
-def success():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin.html', user_name=user_name)
-
-# CRUD routes for User model
-@app.route('/user', methods=['POST'])
-@login_required
-def create_user():
-    data = request.get_json()
-    new_user = User(name=data['name'], email=data['email'], role=data.get('role', 'basicuser'), status=data.get('status', 'active'))
-    db.session.add(new_user)
-    db.session.commit()
-    return jsonify({'message': 'User created successfully'}), 201
-
-@app.route('/users', methods=['GET'])
-@login_required
-def get_users():
-    users = User.query.all()
-    user_list = [{'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role, 'status': user.status} for user in users]
-    return jsonify(user_list)
-
-@app.route('/user/<int:id>', methods=['PUT'])
-@login_required
-def update_user(id):
-    data = request.get_json()
-    user = User.query.get(id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    user.name = data['name']
-    user.email = data['email']
-    user.role = data.get('role', user.role)
-    user.status = data.get('status', user.status)
-    db.session.commit()
-    return jsonify({'message': 'User updated successfully'})
-
-@app.route('/user/<int:id>', methods=['DELETE'])
-@login_required
-def delete_user(id):
-    user = User.query.get(id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'message': 'User deleted successfully'})
-
-# Route to test database connection
-@app.route('/test-db-connection')
-@login_required
-def test_db_connection():
-    try:
-        with pyodbc.connect(conn_string) as conn:
-            cursor = conn.cursor()
-            cursor.execute("SELECT 1")
-            result = cursor.fetchone()
-            if result:
-                return jsonify({'message': 'Database connection successful', 'result': result[0]})
-    except Exception as e:
-        return jsonify({'error': str(e), 'connection_string': conn_string})
-
-# Routes for HTML templates
-@app.route('/admin-create-user')
-@login_required
-def admin_create_user():
-    return render_template('admin-create-user.html')
-
-@app.route('/admin-delete-user')
-@login_required
-def admin_delete_user():
-    return render_template('admin-delete-user.html')
-
-@app.route('/admin-edit-profile')
-@login_required
-def admin_edit_profile():
-    return render_template('admin-edit-profile.html')
-
-@app.route('/admin-update-user')
-@login_required
-def admin_update_user():
-    return render_template('admin-update-user.html')
-
-@app.route('/admin-view-profile')
-@login_required
-def admin_view_profile():
-    return render_template('admin-view-profile.html')
-
-@app.route('/admin-view-user')
-@login_required
-def admin_view_user():
-    return render_template('admin-view-user.html')
-
-@app.route('/admin')
-@login_required
-def admin():
-    return render_template('admin.html')
-
-@app.route('/basic_user_edit')
-@login_required
-def basic_user_edit():
-    return render_template('basic_user_edit.html')
+@app.route('/logout')
+def logout():
+    session.clear()
+    return redirect(url_for('index'))
 
 @app.route('/basic_user_home')
-@login_required
 def basic_user_home():
-    return render_template('basic_user_home.html')
+    if 'user' not in session:
+        return redirect(url_for('index'))
+    return render_template('basic_user_home.html', user_name=session['user']['displayName'])
 
 @app.route('/basic_user_view')
-@login_required
 def basic_user_view():
-    return render_template('basic_user_view.html')
+    if 'user' not in session:
+        return redirect(url_for('index'))
+    user = session['user']
+    return render_template("basic_user_view.html", user=user)
 
-@app.route('/index')
-def index_page():
-    return render_template('index.html')
 
-@app.route('/login')
-def login_page():
-    return render_template('login.html')
+@app.route('/basic_user_edit')
+def basic_user_edit():
+    return render_template("basic_user_edit.html")
 
-# Helper function to build the authorization URL
+@app.route('/user/profile')
+def user_profile():
+    if "user" not in session:
+        return jsonify({"error": "User not logged in"}), 401
+    user = User.query.filter_by(email=session['user'].get('email')).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    return jsonify({"name": user.name, "email": user.email, "role": user.role, "status": user.status})
+
+
+@app.route('/user/profile/update', methods=['PUT'])
+def update_user_profile():
+    if "user" not in session:
+        return jsonify({"error": "User not logged in"}), 401
+    user = User.query.filter_by(email=session['user'].get('email')).first()
+    if not user:
+        return jsonify({"error": "User not found"}), 404
+    data = request.get_json()
+    user.name = data.get("name", user.name)
+    db.session.commit()
+    return jsonify({"message": "Profile updated successfully!"})
+
+# Helper functions
 def _build_auth_url(scopes=None, state=None):
-    return msal.PublicClientApplication(
-        CLIENT_ID, authority=AUTHORITY).get_authorization_request_url(
+    return msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY).get_authorization_request_url(
         scopes, state=state, redirect_uri=REDIRECT_URI)
 
-# Helper function to get the access token
 def _get_token_from_code(code):
-    try:
-        client = msal.ConfidentialClientApplication(
-            CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET)
-        result = client.acquire_token_by_authorization_code(
-            code, scopes=SCOPE, redirect_uri=REDIRECT_URI)
-        return result.get('access_token')
-    except Exception as e:
-        print(f"Error acquiring token: {e}")
-        return None
+    client = msal.ConfidentialClientApplication(CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET)
+    result = client.acquire_token_by_authorization_code(code, scopes=SCOPE, redirect_uri=REDIRECT_URI)
+    return result.get("access_token")
 
-# Helper function to get user info from Microsoft Graph
 def _get_user_info(token):
-    try:
-        graph_data = requests.get(
-            'https://graph.microsoft.com/v1.0/me',
-            headers={'Authorization': 'Bearer ' + token}).json()
-        return graph_data
-    except Exception as e:
-        print(f"Error fetching user info: {e}")
-        return None
+    user_info = requests.get('https://graph.microsoft.com/v1.0/me', headers={'Authorization': 'Bearer ' + token}).json()
+    user_info['role'] = 'basicuser'
+    user_info['status'] = 'active'
+    return user_info
 
 if __name__ == '__main__':
     # Create database tables (if they don't exist)
