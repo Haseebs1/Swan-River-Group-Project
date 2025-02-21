@@ -1,5 +1,28 @@
-)
+from flask import Flask, redirect, url_for, session, request, render_template, jsonify
+import msal
+import requests
+import os
+import pyodbc
+from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
+from flask_session import Session
+# Load environment variables
+load_dotenv()
 
+# Initialize Flask app
+app = Flask(__name__, template_folder='docs', static_folder='docs')
+app.secret_key = os.getenv('SECRET_KEY')  # Required for session management
+
+# Azure AD configuration
+CLIENT_ID = os.getenv('CLIENT_ID')
+CLIENT_SECRET = os.getenv('CLIENT_SECRET')
+TENANT_ID = os.getenv('TENANT_ID')
+AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
+REDIRECT_URI = os.getenv('REDIRECT_URI')
+SCOPE = ['User.Read']
+
+# Your database connection string
+conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"mssql+pyodbc:///?odbc_connect={conn_string}"
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
