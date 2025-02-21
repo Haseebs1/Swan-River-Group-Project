@@ -1,28 +1,4 @@
-from flask import Flask, redirect, url_for, session, request, render_template, jsonify
-import msal
-import requests
-import os
-import pyodbc
-from dotenv import load_dotenv
-from flask_sqlalchemy import SQLAlchemy
-from flask_session import Session
-# Load environment variables
-load_dotenv()
-
-# Initialize Flask app
-app = Flask(__name__, template_folder='docs', static_folder='docs')
-app.secret_key = os.getenv('SECRET_KEY')  # Required for session management
-
-# Azure AD configuration
-CLIENT_ID = os.getenv('CLIENT_ID')
-CLIENT_SECRET = os.getenv('CLIENT_SECRET')
-TENANT_ID = os.getenv('TENANT_ID')
-AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
-REDIRECT_URI = os.getenv('REDIRECT_URI')
-SCOPE = ['User.Read']
-
-# Your database connection string
-conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
+)
 
 # Database configuration
 app.config['SQLALCHEMY_DATABASE_URI'] = f"mssql+pyodbc:///?odbc_connect={conn_string}"
@@ -39,107 +15,141 @@ class User(db.Model):
     role = db.Column(db.String(50), default="basicuser")
     status = db.Column(db.String(20), default="active")
 
-
-# Routes
+# Home page
 @app.route('/')
 def index():
     return render_template('index.html')
 
+# Login page
 @app.route('/login')
 def login():
     return render_template('login.html')
 
+# Initiate Microsoft 365 login
 @app.route('/azure_login')
 def azure_login():
-    session['state'] = 'random_state'
+    session['state'] = os.urandom(16).hex()  # Generate a random state for security
     auth_url = _build_auth_url(scopes=SCOPE, state=session['state'])
     return redirect(auth_url)
 
+# Callback route after Microsoft 365 login
 @app.route('/auth/callback')
 def authorized():
+    if request.args.get('state') != session.get('state'):
+        return redirect(url_for('index'))  # Prevent CSRF attacks
+
     code = request.args.get('code')
     if not code:
         return redirect(url_for('index'))
+
     token = _get_token_from_code(code)
+    if not token:
+        return redirect(url_for('index'))
+
     user_info = _get_user_info(token)
-    
-    # Check if the user exists in the database
-    user = User.query.filter_by(email=user_info['mail']).first()
-    if not user:
-        # Create a new user if not found
-        user = User(name=user_info['displayName'], email=user_info['mail'])
-    user.status = "active"  # Set the status to active
-    db.session.add(user)
-    db.session.commit()
-    
+    if not user_info:
+        return redirect(url_for('index'))
+
     session['user'] = user_info
-    return redirect(url_for('basic_user_home'))
+    return redirect(url_for('success'))
 
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
-
-@app.route('/basic_user_home')
-def basic_user_home():
-    if 'user' not in session:
+# Success page after login
+@app.route('/success')
+def success():
+    if not session.get('user'):
         return redirect(url_for('index'))
-    return render_template('basic_user_home.html', user_name=session['user']['displayName'])
+    user_name = session['user']['displayName']
+    return render_template('admin.html', user_name=user_name)
 
-@app.route('/basic_user_view')
-def basic_user_view():
-    if 'user' not in session:
-        return redirect(url_for('index'))
-    user = session['user']
-    return render_template("basic_user_view.html", user=user)
+# CRUD routes for User model
 
-
-@app.route('/basic_user_edit')
-def basic_user_edit():
-    return render_template("basic_user_edit.html")
-
-@app.route('/user/profile')
-def user_profile():
-    if "user" not in session:
-        return jsonify({"error": "User not logged in"}), 401
-    user = User.query.filter_by(email=session['user'].get('email')).first()
-    if not user:
-        return jsonify({"error": "User not found"}), 404
-    return jsonify({"name": user.name, "email": user.email, "role": user.role, "status": user.status})
-
-
-@app.route('/user/profile/update', methods=['PUT'])
-def update_user_profile():
-    if "user" not in session:
-        return jsonify({"error": "User not logged in"}), 401
-    user = User.query.filter_by(email=session['user'].get('email')).first()
-    if not user:
-        return jsonify({"error": "User not found"}), 404
+# Create User
+@app.route('/user', methods=['POST'])
+def create_user():
     data = request.get_json()
-    user.name = data.get("name", user.name)
+    new_user = User(name=data['name'], email=data['email'], role=data.get('role', 'basicuser'), status=data.get('status', 'active'))
+    db.session.add(new_user)
     db.session.commit()
-    return jsonify({"message": "Profile updated successfully!"})
+    return jsonify({'message': 'User created successfully'}), 201
 
-# Helper functions
+# Read Users
+@app.route('/users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    user_list = [{'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role, 'status': user.status} for user in users]
+    return jsonify(user_list)
+
+# Update User
+@app.route('/user/<int:id>', methods=['PUT'])
+def update_user(id):
+    data = request.get_json()
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    user.name = data['name']
+    user.email = data['email']
+    user.role = data.get('role', user.role)
+    user.status = data.get('status', user.status)
+    db.session.commit()
+    return jsonify({'message': 'User updated successfully'})
+
+# Delete User
+@app.route('/user/<int:id>', methods=['DELETE'])
+def delete_user(id):
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message': 'User deleted successfully'})
+
+# Route to test database connection
+@app.route('/test-db-connection')
+def test_db_connection():
+    try:
+        with pyodbc.connect(conn_string) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            if result:
+                return jsonify({'message': 'Database connection successful', 'result': result[0]})
+    except Exception as e:
+        return jsonify({'error': str(e), 'connection_string': conn_string})
+
+# Helper function to build the authorization URL
 def _build_auth_url(scopes=None, state=None):
-    return msal.PublicClientApplication(CLIENT_ID, authority=AUTHORITY).get_authorization_request_url(
+    return msal.PublicClientApplication(
+        CLIENT_ID, authority=AUTHORITY).get_authorization_request_url(
         scopes, state=state, redirect_uri=REDIRECT_URI)
 
+# Helper function to get the access token
 def _get_token_from_code(code):
-    client = msal.ConfidentialClientApplication(CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET)
-    result = client.acquire_token_by_authorization_code(code, scopes=SCOPE, redirect_uri=REDIRECT_URI)
-    return result.get("access_token")
+    try:
+        client = msal.ConfidentialClientApplication(
+            CLIENT_ID, authority=AUTHORITY, client_credential=CLIENT_SECRET)
+        result = client.acquire_token_by_authorization_code(
+            code, scopes=SCOPE, redirect_uri=REDIRECT_URI)
+        return result.get('access_token')
+    except Exception as e:
+        print(f"Error acquiring token: {e}")
+        return None
 
+# Helper function to get user info from Microsoft Graph
 def _get_user_info(token):
-    user_info = requests.get('https://graph.microsoft.com/v1.0/me', headers={'Authorization': 'Bearer ' + token}).json()
-    user_info['role'] = 'basicuser'
-    user_info['status'] = 'active'
-    return user_info
+    try:
+        graph_data = requests.get(
+            'https://graph.microsoft.com/v1.0/me',
+            headers={'Authorization': 'Bearer ' + token}).json()
+        return graph_data
+    except Exception as e:
+        print(f"Error fetching user info: {e}")
+        return None
 
 if __name__ == '__main__':
+    # Create database tables (if they don't exist)
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=8000, debug=True)
+    app.run(host='0.0.0.0', port=5000)
 
 
 '''from flask import Flask, jsonify
