@@ -98,7 +98,7 @@ def admin_view_profile():
         return redirect(url_for('index'))  # Redirect if user not found in the database
 
     # Pass all user details to the template
-    return render_template('admin_view_profile.html', 
+    return render_template('admin-view-profile.html', 
                            user_name=user.name, 
                            user_email=user.email, 
                            user_role=user.role, 
