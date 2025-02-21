@@ -1,9 +1,10 @@
-'''from flask import Flask, redirect, url_for, session, request, render_template
-from flask_sqlalchemy import SQLAlchemy
+from flask import Flask, redirect, url_for, session, request, render_template, jsonify
 import msal
 import requests
 import os
+import pyodbc
 from dotenv import load_dotenv
+from flask_sqlalchemy import SQLAlchemy
 
 # Load environment variables
 load_dotenv()
@@ -20,21 +21,18 @@ AUTHORITY = f"https://login.microsoftonline.com/{TENANT_ID}"
 REDIRECT_URI = os.getenv('REDIRECT_URI')
 SCOPE = ['User.Read']
 
-# Azure SQL Database configuration
-app.config['SQLALCHEMY_DATABASE_URI'] = (
-    f"mssql+pyodbc://{os.getenv('AZURE_SQL_USERNAME')}:{os.getenv('AZURE_SQL_PASSWORD')}@"
-    f"{os.getenv('AZURE_SQL_SERVER')}/{os.getenv('AZURE_SQL_DATABASE')}?"
-    "driver=ODBC+Driver+18+for+SQL+Server&Encrypt=yes&TrustServerCertificate=no"
-)
-app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+# Your database connection string
+conn_string = "Driver={ODBC Driver 18 for SQL Server};Server=tcp:swan-river123.database.windows.net,1433;Database=Swan-River;Uid=swanriver;Pwd=Admin123;Encrypt=yes;TrustServerCertificate=no;Connection Timeout=30;"
 
-# Initialize SQLAlchemy
+# Database configuration
+app.config['SQLALCHEMY_DATABASE_URI'] = f"mssql+pyodbc:///?odbc_connect={conn_string}"
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
-# Define the User model
+# User Model
 class User(db.Model):
-    __tablename__ = 'User'  # Explicitly sets table name to match table in Azure database
-
+    __tablename__ = 'User' # Explicitly sets table name to match table in Azure database
+    
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)
     email = db.Column(db.String(100), unique=True, nullable=False)
@@ -87,68 +85,60 @@ def success():
     user_name = session['user']['displayName']
     return render_template('admin.html', user_name=user_name)
 
-# Admin view profile page
-@app.route('/admin-view-profile')
-def admin_view_profile():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-view-profile.html', user_name=user_name)
+# CRUD routes for User model
 
-# Admin edit profile page
-@app.route('/admin-edit-profile')
-def admin_edit_profile():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-edit-profile.html', user_name=user_name)
+# Create User
+@app.route('/user', methods=['POST'])
+def create_user():
+    data = request.get_json()
+    new_user = User(name=data['name'], email=data['email'], role=data.get('role', 'basicuser'), status=data.get('status', 'active'))
+    db.session.add(new_user)
+    db.session.commit()
+    return jsonify({'message': 'User created successfully'}), 201
 
-# Admin create user page
-@app.route('/admin-create-user')
-def admin_create_user():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-create-user.html', user_name=user_name)
+# Read Users
+@app.route('/users', methods=['GET'])
+def get_users():
+    users = User.query.all()
+    user_list = [{'id': user.id, 'name': user.name, 'email': user.email, 'role': user.role, 'status': user.status} for user in users]
+    return jsonify(user_list)
 
-# Admin view users page
-@app.route('/admin-view-user')
-def admin_view_user():
-    if not session.get('user'):
-        return redirect(url_for('index'))
+# Update User
+@app.route('/user/<int:id>', methods=['PUT'])
+def update_user(id):
+    data = request.get_json()
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    user.name = data['name']
+    user.email = data['email']
+    user.role = data.get('role', user.role)
+    user.status = data.get('status', user.status)
+    db.session.commit()
+    return jsonify({'message': 'User updated successfully'})
 
+# Delete User
+@app.route('/user/<int:id>', methods=['DELETE'])
+def delete_user(id):
+    user = User.query.get(id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message': 'User deleted successfully'})
+
+# Route to test database connection
+@app.route('/test-db-connection')
+def test_db_connection():
     try:
-        # Fetch all users from the database
-        users = User.query.all()
-        user_name = session['user']['displayName']
-        return render_template('admin-view-user.html', user_name=user_name, users=users)
-
+        with pyodbc.connect(conn_string) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT 1")
+            result = cursor.fetchone()
+            if result:
+                return jsonify({'message': 'Database connection successful', 'result': result[0]})
     except Exception as e:
-        # Log any errors
-        print(f"Error fetching users: {e}")
-        return "An error occurred while fetching users.", 500
-
-# Admin update user page
-@app.route('/admin-update-user')
-def admin_update_user():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-update-user.html', user_name=user_name)
-
-# Admin delete user page
-@app.route('/admin-delete-user')
-def admin_delete_user():
-    if not session.get('user'):
-        return redirect(url_for('index'))
-    user_name = session['user']['displayName']
-    return render_template('admin-delete-user.html', user_name=user_name)
-
-# Logout route
-@app.route('/logout')
-def logout():
-    session.clear()
-    return redirect(url_for('index'))
+        return jsonify({'error': str(e), 'connection_string': conn_string})
 
 # Helper function to build the authorization URL
 def _build_auth_url(scopes=None, state=None):
@@ -183,9 +173,10 @@ if __name__ == '__main__':
     # Create database tables (if they don't exist)
     with app.app_context():
         db.create_all()
-    app.run(host='0.0.0.0', port=5000)'''
+    app.run()
 
-from flask import Flask, jsonify
+
+'''from flask import Flask, jsonify
 import pyodbc
 
 app = Flask(__name__)
@@ -206,5 +197,5 @@ def test_db_connection():
         return jsonify({'error': str(e)})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=True)'''
 
